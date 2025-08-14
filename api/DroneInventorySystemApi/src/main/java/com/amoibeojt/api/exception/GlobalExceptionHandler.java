@@ -1,6 +1,8 @@
 package com.amoibeojt.api.exception;
 
 import java.time.ZonedDateTime;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.springframework.core.convert.ConversionFailedException;
 import org.springframework.http.HttpStatus;
@@ -102,14 +104,34 @@ public class GlobalExceptionHandler {
     
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponseDTO> handleAllExceptions(Exception ex) {
+    	String userMessage = null;
+        String errorMessage = ex.getMessage();
+        if (errorMessage != null && errorMessage.contains("default message")) {
+        	userMessage = extractUserFriendlyMessage(errorMessage);
+        }
+    	
         ErrorResponseDTO error = new ErrorResponseDTO(
             "error",
             "予期しないエラーが発生しました",
             "INTERNAL_ERROR",
-            ex.getMessage(),
+            userMessage,
             ZonedDateTime.now().toString()
         );
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
     }
+    
+    // 全てのdefault messageを抽出するヘルパーメソッド
+    private String extractUserFriendlyMessage(String errorMessage) {
+        Pattern pattern = Pattern.compile("default message \\[([^\\]]+)\\]");
+        Matcher matcher = pattern.matcher(errorMessage);
+        
+        String japaneseMessage = "予期しないエラーが発生しました";
+        while (matcher.find()) {
+            String message = matcher.group(1);
+            japaneseMessage = message;
+        }
+        return japaneseMessage;
+    }
+    
 }

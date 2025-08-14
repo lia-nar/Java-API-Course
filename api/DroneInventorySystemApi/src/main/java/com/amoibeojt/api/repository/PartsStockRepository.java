@@ -1,6 +1,7 @@
 package com.amoibeojt.api.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -45,4 +46,6 @@ public interface PartsStockRepository extends JpaRepository<PartsStock, Integer>
 					@Param("amountMax") Integer amountMax
 					);
 
+	@Query("SELECT p FROM PartsStock p WHERE p.stockId = :stockId")
+	Optional<PartsStock> findLatestByStockId(@Param("stockId") Integer stockId);
 }
