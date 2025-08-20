@@ -4,7 +4,6 @@ import java.util.List;
 
 import jakarta.validation.Valid;
 
-import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.Errors;
 import org.springframework.web.bind.WebDataBinder;
@@ -21,11 +20,11 @@ import com.amoibeojt.api.dto.ApiResponse;
 import com.amoibeojt.api.dto.PagedResponse;
 import com.amoibeojt.api.dto.partsstock.PartsStockResponseDTO;
 import com.amoibeojt.api.dto.partsstock.PartsStockSearchDTO;
+import com.amoibeojt.api.dto.partsstock.ReceiveItemDTO;
 import com.amoibeojt.api.dto.partsstock.ReceiveRequestDTO;
 import com.amoibeojt.api.exception.InvalidInputException;
 import com.amoibeojt.api.service.partsstock.PartsStockReceiveService;
 import com.amoibeojt.api.service.partsstock.PartsStockService;
-import com.amoibeojt.api.validator.PartsStockReceiveValidator;
 import com.amoibeojt.api.validator.PartsStockSearchValidator;
 
 import lombok.RequiredArgsConstructor;
@@ -49,8 +48,6 @@ public class PartsStockController {
     private final PartsStockReceiveService partsStockReceiveService;
     
     private final PartsStockSearchValidator validator;
-    
-    private final PartsStockReceiveValidator receiveValidator;
 
     //バリデータをバインド - 特定のパラメータ名にのみ適用
     @InitBinder("criteria")
@@ -124,20 +121,24 @@ public class PartsStockController {
      * 
      */
     @PostMapping("/receive")
-    public ResponseEntity<ApiResponse<String>> registerOrUpdate(@RequestBody @Valid ReceiveRequestDTO request) {
+    public ApiResponse<String> registerOrUpdate(@RequestBody @Valid ReceiveRequestDTO request) {
     	
-        // バリデーションチェック
-        Errors errors = new BeanPropertyBindingResult(request, "request");
-        receiveValidator.validate(request, errors);
-        if (errors.hasErrors()) {
-            String code = errors.getAllErrors().get(0).getCode();
-            throw new InvalidInputException(code);
+        List<ReceiveItemDTO> items = request.getItems();
+
+        // 各アイテムに対して処理実行
+        for (ReceiveItemDTO item : items) {
+        	
+            // 更新前の在庫数量を事前に取得（履歴登録用）
+            Integer beforeAmount = partsStockReceiveService.findExistingStockAmount(item.getStock_id());
+
+            // 部品在庫テーブルの更新または新規登録
+            Integer actualStockId = partsStockReceiveService.saveOrUpdatePartsStock(item);
+
+            // 履歴テーブルへの新規登録
+            partsStockReceiveService.insertPartsStockHistory(actualStockId,beforeAmount ,item ,request);
+            
         }
-    	
-    	// サービスを呼び出しデータを登録処理
-    	ApiResponse<String> response = partsStockReceiveService.receiveStock(request);
-    	
-    	return ResponseEntity.ok(response);
-    	
+
+        return new ApiResponse<>("success", "部品入荷情報を正常に登録しました", null);
     }
 }

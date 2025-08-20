@@ -2,13 +2,14 @@ package com.amoibeojt.api.service.partsstock;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Optional;
 
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.amoibeojt.api.dto.ApiResponse;
 import com.amoibeojt.api.dto.partsstock.ReceiveItemDTO;
 import com.amoibeojt.api.dto.partsstock.ReceiveRequestDTO;
 import com.amoibeojt.api.entity.PartsStock;
@@ -32,86 +33,105 @@ public class PartsStockReceiveService {
     
     private final PartsStockHistoryRepository historyRepository;
     
-	 /**
-     * 部品入出庫履歴テーブルの更新/登録 
-     * @param request 部品入荷DTO
-     * @return ApiResponse
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    
+    /**
+     * 既存在庫数量を取得
+     * @param stockId 在庫ID
+     * @return amount（存在しない場合は 0）
      */
-	@Transactional
-    public ApiResponse<String> receiveStock(ReceiveRequestDTO request) {
-    	
-    	List<ReceiveItemDTO> items = request.getItems();
-    	
-    	try {
-        	// 個別のアイテムをList<ReceiveItemDTO> はリスト（配列）から取得
-            for (ReceiveItemDTO item : items) {
-                Integer stockId = item.getStock_id();
-                Integer centerId = item.getCenter_id();
-                Integer category_id  = item.getCategory_id();
-                String partsName = item.getParts_name();
-                Integer receive_amount = item.getReceive_amount();
-                String description  = item.getDescription();
+    @Transactional(readOnly = true)
+    public Integer findExistingStockAmount(Integer stockId) {
+        return repository.findLatestByStockId(stockId)
+                .map(PartsStock::getAmount)
+                .orElse(0);
+    }
+    
+    /**
+     * 部品在庫を更新または新規登録
+     * @param item
+     * @return 実際のstock_id
+     */
+    @Transactional
+	public Integer saveOrUpdatePartsStock(ReceiveItemDTO item) {
+        
+        try {
+        	
+            // 部品在庫テーブルから既存レコードを検索
+            Optional<PartsStock> stockOpt = repository.findLatestByStockId(item.getStock_id());
+            Integer actualStockId;
+            
+            if (stockOpt.isPresent()) {
+                // 既存レコード更新
+                PartsStock stock = stockOpt.get();
+                stock.setAmount(stock.getAmount() + item.getReceive_amount());
+                stock.setUpdateDate(LocalDateTime.now());
+                repository.save(stock);
+                actualStockId = stock.getStockId();
                 
-                // 実際に使用するstock_id
-                Integer actualStockId;
+            } else {
+                // 新規レコード登録
+                PartsStock newStock = new PartsStock();
+                newStock.setCenterId(item.getCenter_id());
+                newStock.setCategoryId(item.getCategory_id());
+                newStock.setName(item.getParts_name());
+                newStock.setAmount(item.getReceive_amount());
+                newStock.setDescription(item.getDescription());
+                newStock.setDeleteFlag(false);
+                newStock.setCreateDate(LocalDateTime.now());
+                newStock.setUpdateDate(LocalDateTime.now());
                 
-                //  部品在庫テーブルから既存レコードを検索
-                Optional<PartsStock> stockOpt = repository.findLatestByStockId(stockId);
-                PartsStock stock = stockOpt.orElse(null);
-                
-                // 部品在庫 既存レコード更新
-                if (stockOpt.isPresent()) {
-                    stock.setAmount(stock.getAmount() + receive_amount);
-                    stock.setUpdateDate(LocalDateTime.now());
-                    repository.save(stock);
-                    actualStockId = stock.getStockId();
-                } else {
-                    // 部品在庫 新規レコード登録
-                    PartsStock newStock = new PartsStock();
-                    newStock.setCenterId(centerId);
-                    newStock.setCategoryId(category_id);
-                    newStock.setName(partsName);
-                    newStock.setAmount(receive_amount);
-                    newStock.setDescription(description);
-                    newStock.setDeleteFlag(false);
-                    newStock.setCreateDate(LocalDateTime.now());
-                    newStock.setUpdateDate(LocalDateTime.now());
-                    PartsStock savedStock = repository.save(newStock);
-                    actualStockId = savedStock.getStockId();
-                }
-                
-                // 履歴テーブルから既存の最新レコードを取得
-                Optional<PartsStockHistory> historyOpt = historyRepository.findFirstByStockIdOrderByCreateDateDesc(actualStockId);
-                PartsStockHistory history = historyOpt.orElse(null);
-                
-                // 部品在庫履歴 新規レコード登録
-                PartsStockHistory newHistory = new PartsStockHistory();
-                newHistory.setStockId(actualStockId);
-                newHistory.setTransactionType(request.getTransaction_type());
-            	LocalDate date = LocalDate.parse(request.getTransaction_date());
-            	LocalDateTime transactionDate = date.atStartOfDay();
-                newHistory.setTransactionDate(transactionDate);
-                newHistory.setAmountChange(receive_amount);
-                if (historyOpt.isPresent()) {
-                    newHistory.setAmountBefore(history.getAmountAfter());
-                    newHistory.setAmountAfter(history.getAmountAfter() + receive_amount);
-                } else {
-                    newHistory.setAmountBefore(0);
-                    newHistory.setAmountAfter(receive_amount);
-                }
-                newHistory.setSupplierName(request.getSupplier_name());
-                newHistory.setPurchaseOrderNo(request.getPurchase_order_no());
-                newHistory.setOperatorName(request.getOperator_name());
-                newHistory.setDeleteFlag(false);
-                newHistory.setCreateDate(LocalDateTime.now());
-                newHistory.setUpdateDate(LocalDateTime.now());
-                historyRepository.save(newHistory);
-
+                PartsStock savedStock = repository.save(newStock);
+                actualStockId = savedStock.getStockId();
             }
-    	} catch (Exception e) {
-    	    throw new InvalidInputException("部品在庫履歴の登録に失敗しました");
-    	}
-    	return new ApiResponse<>("success", "部品入荷情報を正常に登録しました", null);
+            
+            return actualStockId;
+            
+        } catch (DataAccessException e) {
+            throw new InvalidInputException("部品在庫登録処理中にDBエラーが発生しました。");
+        } catch (Exception e) {
+            throw new InvalidInputException("部品在庫の登録に失敗しました: StockId=" + item.getStock_id());
+        }
+    }
+	
+    /**
+     * 部品在庫履歴を登録
+     * @param actualStockId 実際のstock_id
+     * @param beforeAmount 既存のamount（存在しない場合は 0）
+     * @param item 入荷アイテム情報
+     * @param request 入荷リクエスト情報
+     * @return 登録された履歴情報
+     */
+    @Transactional
+    public PartsStockHistory insertPartsStockHistory(Integer actualStockId, Integer beforeAmount, ReceiveItemDTO item, ReceiveRequestDTO request) {
+
+        LocalDateTime transactionDate = parseTransactionDate(request.getTransaction_date());
+        PartsStockHistory newHistory = PartsStockHistoryRepository.build(actualStockId, beforeAmount, item, request, transactionDate);
+
+        try {
+        	return historyRepository.upsertHistory(newHistory);
+        } catch (DataAccessException e) {
+            throw new InvalidInputException("部品在庫履歴登録処理中にDBエラーが発生しました。");
+        } catch (Exception e) {
+            throw new InvalidInputException("部品在庫履歴の登録に失敗しました: StockId=" + actualStockId);
+        }
+    }
+    
+    /**
+     * 取引日付の解析
+     * @param transactionDateStr 取引日付文字列
+     * @return LocalDateTime
+     */
+    private LocalDateTime parseTransactionDate(String transactionDateStr) {
+        if (transactionDateStr == null || transactionDateStr.isBlank()) {
+            throw new InvalidInputException("取引日付が指定されていません。");
+        }
+        try {
+            LocalDate date = LocalDate.parse(transactionDateStr, DATE_FORMATTER);
+            return date.atStartOfDay();
+        } catch (DateTimeParseException e) {
+            throw new InvalidInputException("取引日付の形式が不正です: " + transactionDateStr);
+        }
     }
 
 }
