@@ -62,12 +62,12 @@ public class PartsStockReceiveService {
                     item.getStock_id(),
                     item.getCenter_id(),
                     item.getCategory_id(),
-                    item.getParts_name(),          // DTOのparts_name → テーブルのname
-                    item.getReceive_amount(),      // DTOのreceive_amount → テーブルのamount
+                    item.getParts_name(),
+                    item.getReceive_amount(),
                     item.getDescription(),
-                    false,                         // delete_flag
-                    now,                          // create_date
-                    now                           // update_date
+                    false,
+                    now,
+                    now
                 );
             // 新規・更新どちらでもIDを取得
             return repository.getLastInsertId();
