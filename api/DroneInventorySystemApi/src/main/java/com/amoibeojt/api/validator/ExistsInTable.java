@@ -10,7 +10,7 @@ import jakarta.validation.Constraint;
 import jakarta.validation.Payload;
 
 /**
- * 指定されたテーブルにIDが存在するかをチェックするバリデーションアノテーション
+ * 指定されたテーブルにIDが存在するかをチェックするバリデーション
  * 
  * @author your name
  * 
@@ -36,9 +36,4 @@ public @interface ExistsInTable {
      * チェック対象のフィールド名（デフォルトは"id"）
      */
     String field() default "id";
-    
-    /**
-     * nullを許可するか（デフォルトはtrue）
-     */
-    boolean allowNull() default true;
 }

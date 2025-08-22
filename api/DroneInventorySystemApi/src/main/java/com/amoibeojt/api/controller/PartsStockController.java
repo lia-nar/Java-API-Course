@@ -111,12 +111,7 @@ public class PartsStockController {
     /**
      * 部品入荷
      * 
-     * @param transaction_type
-     * @param transaction_date
-     * @param supplier_name
-     * @param purchase_order_no
-     * @param operator_name
-     * @param items
+     * @param request
      * @return ApiResponse
      * 
      */
@@ -125,7 +120,6 @@ public class PartsStockController {
     	
         List<ReceiveItemDTO> items = request.getItems();
 
-        // 各アイテムに対して処理実行
         for (ReceiveItemDTO item : items) {
         	
             // 更新前の在庫数量を事前に取得（履歴登録用）
@@ -134,7 +128,7 @@ public class PartsStockController {
             // 部品在庫テーブルの更新または新規登録
             Integer actualStockId = partsStockReceiveService.saveOrUpdatePartsStock(item);
 
-            // 履歴テーブルへの新規登録
+            // 部品在庫履歴テーブルの新規登録
             partsStockReceiveService.insertPartsStockHistory(actualStockId,beforeAmount ,item ,request);
             
         }

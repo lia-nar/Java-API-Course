@@ -9,7 +9,7 @@ import jakarta.validation.ConstraintValidatorContext;
 import org.springframework.stereotype.Component;
 
 /**
- * @ExistsInTable アノテーションのバリデーター実装
+ * @ExistsInTable IDチェックバリデーターの実装
  * 
  * @author your name
  * 
@@ -22,20 +22,15 @@ public class ExistsInTableValidator implements ConstraintValidator<ExistsInTable
 
     private Class<?> entityClass;
     private String fieldName;
-    private boolean allowNull;
 
     @Override
     public void initialize(ExistsInTable constraintAnnotation) {
         this.entityClass = constraintAnnotation.entity();
         this.fieldName = constraintAnnotation.field();
-        this.allowNull = constraintAnnotation.allowNull();
     }
 
     @Override
     public boolean isValid(Object value, ConstraintValidatorContext context) {
-        if (value == null) {
-            return allowNull;
-        }
 
         try {
             // エンティティのテーブル名を取得

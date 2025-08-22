@@ -4,7 +4,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.Optional;
 
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
@@ -50,42 +49,28 @@ public class PartsStockReceiveService {
     /**
      * 部品在庫を更新または新規登録
      * @param item
-     * @return 実際のstock_id
+     * @return stock_id
      */
     @Transactional
 	public Integer saveOrUpdatePartsStock(ReceiveItemDTO item) {
         
         try {
+        	LocalDateTime now = LocalDateTime.now();
         	
-            // 部品在庫テーブルから既存レコードを検索
-            Optional<PartsStock> stockOpt = repository.findLatestByStockId(item.getStock_id());
-            Integer actualStockId;
-            
-            if (stockOpt.isPresent()) {
-                // 既存レコード更新
-                PartsStock stock = stockOpt.get();
-                stock.setAmount(stock.getAmount() + item.getReceive_amount());
-                stock.setUpdateDate(LocalDateTime.now());
-                repository.save(stock);
-                actualStockId = stock.getStockId();
-                
-            } else {
-                // 新規レコード登録
-                PartsStock newStock = new PartsStock();
-                newStock.setCenterId(item.getCenter_id());
-                newStock.setCategoryId(item.getCategory_id());
-                newStock.setName(item.getParts_name());
-                newStock.setAmount(item.getReceive_amount());
-                newStock.setDescription(item.getDescription());
-                newStock.setDeleteFlag(false);
-                newStock.setCreateDate(LocalDateTime.now());
-                newStock.setUpdateDate(LocalDateTime.now());
-                
-                PartsStock savedStock = repository.save(newStock);
-                actualStockId = savedStock.getStockId();
-            }
-            
-            return actualStockId;
+            // レコード登録・更新
+            repository.upsertPartsStock(
+                    item.getStock_id(),
+                    item.getCenter_id(),
+                    item.getCategory_id(),
+                    item.getParts_name(),          // DTOのparts_name → テーブルのname
+                    item.getReceive_amount(),      // DTOのreceive_amount → テーブルのamount
+                    item.getDescription(),
+                    false,                         // delete_flag
+                    now,                          // create_date
+                    now                           // update_date
+                );
+            // 新規・更新どちらでもIDを取得
+            return repository.getLastInsertId();
             
         } catch (DataAccessException e) {
             throw new InvalidInputException("部品在庫登録処理中にDBエラーが発生しました。");
@@ -96,10 +81,10 @@ public class PartsStockReceiveService {
 	
     /**
      * 部品在庫履歴を登録
-     * @param actualStockId 実際のstock_id
-     * @param beforeAmount 既存のamount（存在しない場合は 0）
-     * @param item 入荷アイテム情報
-     * @param request 入荷リクエスト情報
+     * @param actualStockId
+     * @param beforeAmount
+     * @param item
+     * @param request
      * @return 登録された履歴情報
      */
     @Transactional

@@ -14,12 +14,12 @@ public class ReceiveItemDTO {
     //在庫ID
     private Integer stock_id;
     
-    //入荷先センター ID
+    //センターID
     @NotNull(message = "センターIDは必須です")
     @ExistsInTable(entity = CenterInfo.class, field = "center_id", message = "指定されたセンターIDは存在しません")
     private Integer center_id;
     
-    //カテゴリ ID
+    //カテゴリID
     @NotNull(message = "カテゴリIDは必須です")
     @ExistsInTable(entity = PartsCategoryInfo.class, field = "category_id", message = "指定されたカテゴリIDは存在しません")
     private Integer category_id;
