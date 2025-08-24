@@ -21,11 +21,11 @@ public class ReceiveRequestDTO {
 	private String transaction_type;
 	
 	//入荷日時
-	@NotNull(message = "取引日付は必須です")
+	@NotNull(message = "入荷日時は必須です")
 	private String transaction_date;
 	
 	//仕入先名
-	@NotNull(message = "供給業者名は必須です")
+	@NotNull(message = "仕入先名は必須です")
 	private String supplier_name;
 	
 	//発注書番号
@@ -33,7 +33,7 @@ public class ReceiveRequestDTO {
 	private String purchase_order_no;
 	
 	//入荷作業者名
-	@NotNull(message = "操作者名は必須です")
+	@NotNull(message = "入荷作業者名は必須です")
 	private String operator_name;
 	
     //入荷部品リスト
