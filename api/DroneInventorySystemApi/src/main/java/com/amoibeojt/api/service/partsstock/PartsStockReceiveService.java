@@ -103,19 +103,16 @@ public class PartsStockReceiveService {
     }
     
     /**
-     * 取引日付の解析
-     * @param transactionDateStr 取引日付文字列
+     * 入荷日時の形式変更
+     * @param transactionDateStr 入荷日時文字列
      * @return LocalDateTime
      */
     private LocalDateTime parseTransactionDate(String transactionDateStr) {
-        if (transactionDateStr == null || transactionDateStr.isBlank()) {
-            throw new InvalidInputException("取引日付が指定されていません。");
-        }
         try {
             LocalDate date = LocalDate.parse(transactionDateStr, DATE_FORMATTER);
             return date.atStartOfDay();
         } catch (DateTimeParseException e) {
-            throw new InvalidInputException("取引日付の形式が不正です: " + transactionDateStr);
+            throw new InvalidInputException("入荷日時の形式が不正です: " + transactionDateStr);
         }
     }
 
